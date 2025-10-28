@@ -1,0 +1,293 @@
+import React from 'react';
+import Header from './components/Header';
+import CurrentPatientAlert from './components/CurrentPatientAlert';
+import Statistics from './components/Statistics';
+import TabNavigation from './components/TabNavigation';
+import PatientTable from './components/PatientTable';
+import AddPatientModal from './components/AddPatientModal';
+
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      patients: [],
+      currentPatient: null,
+      activeTab: 'waiting',
+      showAddPatientModal: false,
+      isRefreshing: false
+    };
+  }
+
+  componentDidMount() {
+    // Mock API data
+    const mockData = [
+      {
+        id: 1,
+        queueNumber: 'Q001',
+        name: 'สมชาย ใจดี',
+        room: 'A101',
+        roomName: 'ห้องตรวจทั่วไป 1',
+        pdate: '2025-10-08',
+        station: 'ห้องตรวจทั่วไป',
+        status: 'waiting',
+        time: '09:00'
+      },
+      {
+        id: 2,
+        queueNumber: 'Q002',
+        name: 'สมหญิง รักษ์ดี',
+        room: 'A102',
+        roomName: 'ห้องตรวจโรคหัวใจ',
+        pdate: '2025-10-08',
+        station: 'ห้องตรวจโรคหัวใจ',
+        status: 'waiting',
+        time: '09:15'
+      },
+      {
+        id: 3,
+        queueNumber: 'Q003',
+        name: 'วิชัย สุขสันต์',
+        room: 'A103',
+        roomName: 'ห้องตรวจเด็ก',
+        pdate: '2025-10-08',
+        station: 'ห้องตรวจทั่วไป',
+        status: 'active',
+        time: '09:30'
+      },
+      {
+        id: 4,
+        queueNumber: 'Q004',
+        name: 'มาลี ดีมาก',
+        room: 'A101',
+        roomName: 'ห้องตรวจทั่วไป 1',
+        pdate: '2025-10-08',
+        station: 'ห้องตรวจเด็ก',
+        status: 'waiting',
+        time: '09:45'
+      },
+      {
+        id: 5,
+        queueNumber: 'Q005',
+        name: 'สมศักดิ์ มั่งมี',
+        room: 'A102',
+        roomName: 'ห้องตรวจโรคหัวใจ',
+        pdate: '2025-10-08',
+        station: 'ห้องตรวจทั่วไป',
+        status: 'completed',
+        time: '08:30'
+      },
+      {
+        id: 6,
+        queueNumber: 'Q006',
+        name: 'วารี สวยงาม',
+        room: 'A103',
+        roomName: 'ห้องตรวจเด็ก',
+        pdate: '2025-10-08',
+        station: 'ห้องตรวจเด็ก',
+        status: 'completed',
+        time: '08:45'
+      }
+    ];
+    
+    // this.setState({ patients: mockData });
+    
+    // ตัวอย่างการเรียก API จริง
+    fetch('http://localhost:3002/api/v1/kiosk/getPatientList')
+      .then(response => response.json())
+      .then(data => this.setState({ patients: data.data }))
+      .catch(error => console.error('Error:', error));
+  }
+
+  handleStart = (patient, fstatus) => {
+    // Send update to API first
+    fetch('http://localhost:3002/api/v1/queues', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ...patient,
+        room_id: patient.room,
+        status: fstatus
+      })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Only update state when API returns no error
+        this.setState({
+          currentPatient: patient,
+          patients: this.state.patients.map(function(p) {
+            if (p.id === patient.id) {
+              return Object.assign({}, p, { status: 'active' });
+            }
+            return p;
+          })
+        });
+        
+        // Optionally reconcile state with server response if needed
+        // Example: if server returns updated patient object
+        if (data && data.patient && data.patient.id) {
+          this.setState({
+            patients: this.state.patients.map(function(p) {
+              if (p.id === data.patient.id) {
+                return Object.assign({}, p, data.patient);
+              }
+              return p;
+            })
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error updating queue:', error);
+        // Show error notification to user
+        alert('Failed to start patient. Please try again.');
+      });
+  }
+
+  handleFinish = (patientId) => {
+    const currentPatient = this.state.currentPatient;
+    this.setState({
+      patients: this.state.patients.map(function(p) {
+        if (p.id === patientId) {
+          return Object.assign({}, p, { status: 'completed' });
+        }
+        return p;
+      }),
+      currentPatient: currentPatient && currentPatient.id === patientId ? null : currentPatient
+    });
+  }
+
+  setActiveTab = (tab) => {
+    this.setState({ activeTab: tab });
+  }
+
+  handleAddPatient = (newPatient) => {
+    const nextId = Math.max(...this.state.patients.map(p => p.id)) + 1;
+    const nextQueueNumber = 'Q' + String(nextId).padStart(3, '0');
+    
+    const patient = {
+      id: nextId,
+      queueNumber: nextQueueNumber,
+      name: newPatient.name,
+      room: newPatient.room,
+      roomName: newPatient.roomName,
+      pdate: newPatient.date,
+      station: newPatient.station,
+      status: newPatient.status,
+      ptime: newPatient.time
+    };
+
+    this.setState({
+      patients: [...this.state.patients, patient],
+      showAddPatientModal: false
+    });
+  }
+
+  toggleAddPatientModal = () => {
+    this.setState({ showAddPatientModal: !this.state.showAddPatientModal });
+  }
+
+  handleRefresh = () => {
+    // Simulate data refresh
+    console.log('Refreshing data...');
+    
+    // In a real application, this would fetch fresh data from the API
+    // For now, we'll just show a brief loading state
+    this.setState({ isRefreshing: true });
+    
+    setTimeout(() => {
+      this.setState({ isRefreshing: false });
+      console.log('Data refreshed successfully');
+    }, 1000);
+  }
+
+  handleRoomChange = (patientId, newRoom) => {
+    this.setState({
+      patients: this.state.patients.map(patient => {
+        if (patient.id === patientId) {
+          return {
+            ...patient,
+            room: newRoom.room_code,
+            roomName: newRoom.room_name
+          };
+        }
+        return patient;
+      })
+    });
+    
+    // Call refresh after room change
+    this.handleRefresh();
+  }
+
+  countByStatus = (status) => {
+    return this.state.patients.filter(function(p) {
+      return p.status === status;
+    }).length;
+  }
+
+  getFilteredPatients = () => {
+    const activeTab = this.state.activeTab;
+    return this.state.patients.filter(function(p) {
+      if (activeTab === 'waiting') {
+        return p.status === 'waiting';
+      } else if (activeTab === 'active') {
+        return p.status === 'active';
+      } else if (activeTab === 'completed') {
+        return p.status === 'completed';
+      }
+      return true;
+    });
+  }
+
+  render() {
+    const filteredPatients = this.getFilteredPatients();
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <Header 
+            onAddPatient={this.toggleAddPatientModal} 
+            onRefresh={this.handleRefresh}
+            isRefreshing={this.state.isRefreshing}
+          />
+          
+          <CurrentPatientAlert currentPatient={this.state.currentPatient} />
+          
+          <Statistics 
+            countByStatus={this.countByStatus}
+            activeTab={this.state.activeTab}
+            setActiveTab={this.setActiveTab}
+          />
+          
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <TabNavigation 
+              activeTab={this.state.activeTab}
+              setActiveTab={this.setActiveTab}
+              countByStatus={this.countByStatus}
+            />
+            
+            <PatientTable 
+              patients={filteredPatients}
+              handleStart={this.handleStart}
+              handleFinish={this.handleFinish}
+              onRoomChange={this.handleRoomChange}
+            />
+          </div>
+        </div>
+
+        <AddPatientModal
+          isOpen={this.state.showAddPatientModal}
+          onClose={this.toggleAddPatientModal}
+          onAddPatient={this.handleAddPatient}
+        />
+      </div>
+    );
+  }
+}
+
+export default App;
