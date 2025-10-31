@@ -33,6 +33,7 @@ class EditableRoomCell extends React.Component {
       isEditing: false,
       rooms: [],
       selectedRoom: null,
+      selectedRoomIndex: null,
       loading: false,
       error: null
     };
@@ -40,6 +41,11 @@ class EditableRoomCell extends React.Component {
 
   componentDidMount() {
     this.loadRooms();
+    const p = this.props.patient;
+    const noRoom = !p || p.room === 0 || p.room === '0' || p.room === null || typeof p.room === 'undefined';
+    if (noRoom) {
+      this.setState({ isEditing: true });
+    }
   }
 
   loadRooms = async () => {
@@ -55,7 +61,7 @@ class EditableRoomCell extends React.Component {
       }
       
       this.setState({ 
-        rooms,
+        rooms: Array.isArray(rooms) ? rooms : [],
         loading: false 
       });
       
@@ -79,7 +85,8 @@ class EditableRoomCell extends React.Component {
   }
 
   handleRoomSelect = (room) => {
-    this.setState({ selectedRoom: room });
+    const index = this.state.rooms.findIndex(function(r) { return r === room; });
+    this.setState({ selectedRoom: room, selectedRoomIndex: index >= 0 ? index : null });
   }
 
   handleSave = () => {
@@ -98,14 +105,23 @@ class EditableRoomCell extends React.Component {
 
   render() {
     const { patient } = this.props;
-    const { isEditing, rooms, selectedRoom, loading, error } = this.state;
+    const { isEditing, rooms, selectedRoom, selectedRoomIndex, loading, error } = this.state;
 
     if (!isEditing) {
       return (
         <div className="flex items-center gap-2">
-          <MapPinIcon className="w-4 h-4 text-gray-400" />
-          <div className="cursor-pointer hover:bg-gray-50 p-1 rounded" onClick={this.handleEdit}>
-            <div className="text-gray-900 font-semibold">{patient.room}</div>
+          <button
+            onClick={this.handleEdit}
+            className="p-1.5 rounded-md hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
+            title="เปลี่ยนห้อง"
+          >
+            <MapPinIcon className="w-5 h-5" />
+          </button>
+          <div 
+            className="cursor-pointer hover:bg-gray-50 hover:border-b-2 hover:border-blue-400 p-1.5 rounded transition-all"
+            onClick={this.handleEdit}
+          >
+            <div className="text-gray-900 font-semibold">{(patient.room === 0 || patient.room === '0' || patient.room === null || typeof patient.room === 'undefined') ? '-' : patient.room}</div>
             {patient.roomName && (
               <div className="text-xs text-gray-500">{patient.roomName}</div>
             )}
@@ -120,39 +136,29 @@ class EditableRoomCell extends React.Component {
           <MapPinIcon className="w-4 h-4 text-gray-400" />
           <div className="flex-1">
             <select
-              value={selectedRoom ? selectedRoom.id : ''}
+              value={selectedRoomIndex !== null ? selectedRoomIndex : ''}
               onChange={(e) => {
-                const room = rooms.find(r => r.id === parseInt(e.target.value));
-                this.handleRoomSelect(room);
+                const idx = parseInt(e.target.value);
+                const room = rooms[idx];
+                if (room) {
+                  // Immediately save selection and close editor
+                  const { onRoomChange } = this.props;
+                  if (onRoomChange) {
+                    onRoomChange(this.props.patient.id, room);
+                  }
+                  this.setState({ selectedRoom: null, selectedRoomIndex: null, isEditing: false });
+                }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               disabled={loading}
             >
               <option value="">เลือกห้องตรวจ</option>
-              {rooms.map((room) => (
-                <option key={room.id} value={room.id}>
+              {rooms.map((room, index) => (
+                <option key={room.id || index} value={index}>
                   {room.room_code} - {room.room_name}
                 </option>
               ))}
             </select>
-          </div>
-          
-          <div className="flex gap-1">
-            <button
-              onClick={this.handleSave}
-              disabled={!selectedRoom}
-              className="p-1 text-green-600 hover:text-green-700 disabled:text-gray-400 disabled:cursor-not-allowed"
-              title="บันทึก"
-            >
-              <CheckIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={this.handleCancel}
-              className="p-1 text-red-600 hover:text-red-700"
-              title="ยกเลิก"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
           </div>
         </div>
         

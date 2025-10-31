@@ -1,13 +1,13 @@
 // API service for examination rooms
 class RoomService {
   constructor() {
-    this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
+    this.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api/v1';
   }
 
   // Get all examination rooms from QNurse database
   async getExaminationRooms() {
     try {
-      const response = await fetch(`${this.baseURL}/examination-rooms`, {
+      const response = await fetch(`${this.baseURL}/rooms`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -21,7 +21,8 @@ class RoomService {
       }
 
       const data = await response.json();
-      return data;
+      const list = Array.isArray(data) ? data : (Array.isArray(data && data.data) ? data.data : []);
+      return list;
     } catch (error) {
       console.error('Error fetching examination rooms:', error);
       throw error;
@@ -31,7 +32,7 @@ class RoomService {
   // Get active examination rooms only
   async getActiveExaminationRooms() {
     try {
-      const response = await fetch(`${this.baseURL}/examination-rooms?status=active`, {
+      const response = await fetch(`${this.baseURL}/rooms?status=active`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +44,8 @@ class RoomService {
       }
 
       const data = await response.json();
-      return data;
+      const list = Array.isArray(data) ? data : (Array.isArray(data && data.data) ? data.data : []);
+      return list;
     } catch (error) {
       console.error('Error fetching active examination rooms:', error);
       throw error;
@@ -53,7 +55,7 @@ class RoomService {
   // Get room by ID
   async getRoomById(roomId) {
     try {
-      const response = await fetch(`${this.baseURL}/examination-rooms/${roomId}`, {
+      const response = await fetch(`${this.baseURL}/rooms/${roomId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +67,7 @@ class RoomService {
       }
 
       const data = await response.json();
-      return data;
+      return (data && data.data) ? data.data : data;
     } catch (error) {
       console.error('Error fetching room by ID:', error);
       throw error;
@@ -151,4 +153,5 @@ class RoomService {
   }
 }
 
-export default new RoomService();
+const roomService = new RoomService();
+export default roomService;

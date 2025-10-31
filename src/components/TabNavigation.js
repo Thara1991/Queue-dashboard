@@ -21,8 +21,7 @@ const CheckCircleIcon = ({ className }) => (
 
 class TabNavigation extends React.Component {
   render() {
-    const { activeTab, setActiveTab, countByStatus } = this.props;
-    const self = this;
+    const { activeTab, setActiveTab, countByStatus, lang } = this.props;
 
     return (
       <div className="flex border-b border-gray-200">
@@ -35,7 +34,7 @@ class TabNavigation extends React.Component {
         >
           <div className="flex items-center justify-center gap-2">
             <ClockIcon className="w-5 h-5" />
-            <span>รอตรวจ ({countByStatus('waiting')})</span>
+            <span>{lang === 'EN' ? 'Waiting' : 'รอตรวจ'} ({countByStatus('waiting')})</span>
           </div>
         </button>
 
@@ -48,7 +47,7 @@ class TabNavigation extends React.Component {
         >
           <div className="flex items-center justify-center gap-2">
             <UserIcon className="w-5 h-5" />
-            <span>กำลังตรวจ ({countByStatus('active')})</span>
+            <span>{lang === 'EN' ? 'Active' : 'กำลังตรวจ'} ({countByStatus('active')})</span>
           </div>
         </button>
 
@@ -61,7 +60,7 @@ class TabNavigation extends React.Component {
         >
           <div className="flex items-center justify-center gap-2">
             <CheckCircleIcon className="w-5 h-5" />
-            <span>ตรวจเสร็จแล้ว ({countByStatus('completed')})</span>
+            <span>{lang === 'EN' ? 'Completed' : 'ตรวจเสร็จแล้ว'} ({countByStatus('completed')})</span>
           </div>
         </button>
       </div>

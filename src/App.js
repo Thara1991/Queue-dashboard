@@ -14,7 +14,7 @@ class App extends React.Component {
       currentPatient: null,
       activeTab: 'waiting',
       showAddPatientModal: false,
-      isRefreshing: false
+      selectedDate: '2025-10-08'
     };
   }
 
@@ -90,63 +90,79 @@ class App extends React.Component {
     ];
     
     // this.setState({ patients: mockData });
-    
-    // ตัวอย่างการเรียก API จริง
-    fetch('http://localhost:3002/api/v1/kiosk/getPatientList')
+
+    // โหลดข้อมูลครั้งแรกตามวันที่ที่เลือก
+    this.fetchPatients(this.state.selectedDate);
+  }
+
+  fetchPatients = (date) => {
+    const acpDte = (date || '').replace(/-/g, '');
+    const url = `http://localhost:3002/api/v1/kiosk/getPatientList?AcpDte=${encodeURIComponent(acpDte)}`;
+    return fetch(url)
       .then(response => response.json())
-      .then(data => this.setState({ patients: data.data }))
+      .then(data => this.setState({ patients: data.data || [] }))
       .catch(error => console.error('Error:', error));
   }
 
-  handleStart = (patient, fstatus) => {
-    // Send update to API first
-    fetch('http://localhost:3002/api/v1/queues', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        ...patient,
-        room_id: patient.room,
-        status: fstatus
-      })
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+  handleStart = async (patient, fstatus) => {
+    try {
+      const response = await fetch('http://localhost:3002/api/v1/queues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...patient,
+          room_id: patient.room,
+          status: fstatus
+        })
+      });
+
+      if (!response.ok) {
+        // Try to surface server error details
+        let serverMessage = '';
+        try {
+          const errorBody = await response.json();
+          serverMessage = errorBody && (errorBody.message || errorBody.error || JSON.stringify(errorBody));
+        } catch (_) {
+          try {
+            serverMessage = await response.text();
+          } catch (_) {
+            serverMessage = '';
+          }
         }
-        return response.json();
-      })
-      .then(data => {
-        // Only update state when API returns no error
+        const details = serverMessage ? `: ${serverMessage}` : '';
+        throw new Error(`HTTP ${response.status}${details}`);
+      }
+
+      const data = await response.json();
+
+      // Update local state according to requested fstatus
+      this.setState({
+        currentPatient: fstatus === 'active' ? patient : this.state.currentPatient,
+        patients: this.state.patients.map(function(p) {
+          if (p.id === patient.id) {
+            return Object.assign({}, p, { status: fstatus });
+          }
+          return p;
+        })
+      });
+
+      // Optionally reconcile with server payload if it returns updated patient
+      if (data && data.patient && data.patient.id) {
         this.setState({
-          currentPatient: patient,
           patients: this.state.patients.map(function(p) {
-            if (p.id === patient.id) {
-              return Object.assign({}, p, { status: 'active' });
+            if (p.id === data.patient.id) {
+              return Object.assign({}, p, data.patient);
             }
             return p;
           })
         });
-        
-        // Optionally reconcile state with server response if needed
-        // Example: if server returns updated patient object
-        if (data && data.patient && data.patient.id) {
-          this.setState({
-            patients: this.state.patients.map(function(p) {
-              if (p.id === data.patient.id) {
-                return Object.assign({}, p, data.patient);
-              }
-              return p;
-            })
-          });
-        }
-      })
-      .catch(error => {
-        console.error('Error updating queue:', error);
-        // Show error notification to user
-        alert('Failed to start patient. Please try again.');
-      });
+      }
+    } catch (error) {
+      console.error('Error updating queue:', error);
+      alert(`Failed to start patient. Please try again.\n${error && error.message ? error.message : ''}`);
+    }
   }
 
   handleFinish = (patientId) => {
@@ -192,19 +208,7 @@ class App extends React.Component {
     this.setState({ showAddPatientModal: !this.state.showAddPatientModal });
   }
 
-  handleRefresh = () => {
-    // Simulate data refresh
-    console.log('Refreshing data...');
-    
-    // In a real application, this would fetch fresh data from the API
-    // For now, we'll just show a brief loading state
-    this.setState({ isRefreshing: true });
-    
-    setTimeout(() => {
-      this.setState({ isRefreshing: false });
-      console.log('Data refreshed successfully');
-    }, 1000);
-  }
+  // Removed old refresh simulation; data now refreshes on date change
 
   handleRoomChange = (patientId, newRoom) => {
     this.setState({
@@ -219,9 +223,16 @@ class App extends React.Component {
         return patient;
       })
     });
-    
-    // Call refresh after room change
-    this.handleRefresh();
+    // No auto-refresh here; date change controls refresh
+  }
+
+  handleDateChange = (newDate) => {
+    this.setState({ selectedDate: newDate });
+    this.fetchPatients(newDate);
+  }
+
+  handleToggleLang = (lang) => {
+    this.setState({ lang });
   }
 
   countByStatus = (status) => {
@@ -251,9 +262,11 @@ class App extends React.Component {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
         <div className="max-w-7xl mx-auto">
           <Header 
-            onAddPatient={this.toggleAddPatientModal} 
-            onRefresh={this.handleRefresh}
-            isRefreshing={this.state.isRefreshing}
+            onAddPatient={this.toggleAddPatientModal}
+            selectedDate={this.state.selectedDate}
+            onDateChange={this.handleDateChange}
+            lang={this.state.lang || 'TH'}
+            onToggleLang={this.handleToggleLang}
           />
           
           <CurrentPatientAlert currentPatient={this.state.currentPatient} />
@@ -262,6 +275,7 @@ class App extends React.Component {
             countByStatus={this.countByStatus}
             activeTab={this.state.activeTab}
             setActiveTab={this.setActiveTab}
+            lang={this.state.lang || 'TH'}
           />
           
           <div className="bg-white rounded-lg shadow-lg overflow-hidden">
@@ -269,13 +283,14 @@ class App extends React.Component {
               activeTab={this.state.activeTab}
               setActiveTab={this.setActiveTab}
               countByStatus={this.countByStatus}
+              lang={this.state.lang || 'TH'}
             />
             
             <PatientTable 
               patients={filteredPatients}
               handleStart={this.handleStart}
-              handleFinish={this.handleFinish}
               onRoomChange={this.handleRoomChange}
+              lang={this.state.lang || 'TH'}
             />
           </div>
         </div>

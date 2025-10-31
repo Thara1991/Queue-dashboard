@@ -21,8 +21,7 @@ const CheckCircleIcon = ({ className }) => (
 
 class Statistics extends React.Component {
   render() {
-    const { countByStatus, activeTab, setActiveTab } = this.props;
-    const self = this;
+    const { countByStatus, activeTab, setActiveTab, lang } = this.props;
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -33,11 +32,11 @@ class Statistics extends React.Component {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">รอตรวจ</p>
+              <p className="text-gray-600 text-sm">{lang === 'EN' ? 'Waiting' : 'รอตรวจ'}</p>
               <p className="text-3xl font-bold text-yellow-600">
                 {countByStatus('waiting')}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Waiting</p>
+              <p className="text-xs text-gray-500 mt-1">{lang === 'EN' ? 'Waiting' : 'รอตรวจ'}</p>
             </div>
             <ClockIcon className="w-12 h-12 text-yellow-500" />
           </div>
@@ -50,11 +49,11 @@ class Statistics extends React.Component {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">กำลังตรวจ</p>
+              <p className="text-gray-600 text-sm">{lang === 'EN' ? 'Active' : 'กำลังตรวจ'}</p>
               <p className="text-3xl font-bold text-blue-600">
                 {countByStatus('active')}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Active</p>
+              <p className="text-xs text-gray-500 mt-1">{lang === 'EN' ? 'Active' : 'กำลังตรวจ'}</p>
             </div>
             <UserIcon className="w-12 h-12 text-blue-500" />
           </div>
@@ -67,11 +66,11 @@ class Statistics extends React.Component {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">ตรวจเสร็จแล้ว</p>
+              <p className="text-gray-600 text-sm">{lang === 'EN' ? 'Complete' : 'ตรวจเสร็จแล้ว'}</p>
               <p className="text-3xl font-bold text-green-600">
                 {countByStatus('completed')}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Complete</p>
+              <p className="text-xs text-gray-500 mt-1">{lang === 'EN' ? 'Complete' : 'เสร็จสิ้น'}</p>
             </div>
             <CheckCircleIcon className="w-12 h-12 text-green-500" />
           </div>

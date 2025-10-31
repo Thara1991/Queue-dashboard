@@ -55,25 +55,25 @@ class PatientTable extends React.Component {
   getStatusText(status) {
     switch (status) {
       case 'waiting':
-        return 'รอตรวจ';
+        return this.props.lang === 'EN' ? 'Waiting' : 'รอตรวจ';
       case 'active':
-        return 'กำลังตรวจ';
+        return this.props.lang === 'EN' ? 'Active' : 'กำลังตรวจ';
       case 'completed':
-        return 'ตรวจเสร็จแล้ว';
+        return this.props.lang === 'EN' ? 'Completed' : 'ตรวจเสร็จแล้ว';
       default:
         return status;
     }
   }
 
   render() {
-    const { patients, handleStart, handleFinish, onRoomChange } = this.props;
+    const { patients, handleStart, onRoomChange } = this.props;
     const self = this;
 
     if (patients.length === 0) {
       return (
         <div className="text-center py-12">
           <div className="text-gray-400 text-6xl mb-4">📋</div>
-          <p className="text-gray-500 text-lg">ไม่มีรายการในหมวดนี้</p>
+          <p className="text-gray-500 text-lg">{this.props.lang === 'EN' ? 'No items in this category' : 'ไม่มีรายการในหมวดนี้'}</p>
         </div>
       );
     }
@@ -84,28 +84,28 @@ class PatientTable extends React.Component {
           <thead className="bg-gray-50 border-b-2 border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                เลขคิว
+                {this.props.lang === 'EN' ? 'Queue No.' : 'เลขคิว'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                ชื่อผู้ป่วย
+                {this.props.lang === 'EN' ? 'Patient Name' : 'ชื่อผู้ป่วย'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                ห้อง
+                {this.props.lang === 'EN' ? 'Room' : 'ห้อง'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                วันที่
+                {this.props.lang === 'EN' ? 'Date' : 'วันที่'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                เวลา
+                {this.props.lang === 'EN' ? 'Time' : 'เวลา'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                สถานี
+                {this.props.lang === 'EN' ? 'Station' : 'สถานี'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                สถานะ
+                {this.props.lang === 'EN' ? 'Status' : 'สถานะ'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                จัดการ
+                {this.props.lang === 'EN' ? 'Actions' : 'จัดการ'}
               </th>
             </tr>
           </thead>
@@ -165,13 +165,29 @@ class PatientTable extends React.Component {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex gap-2">
                       {patient.status === 'waiting' && (
-                        <button
-                          onClick={function() { handleStart(patient, 'active'); }}
-                          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md hover:shadow-lg"
-                        >
-                          <PlayIcon className="w-4 h-4" />
-                          เรียกคิว
-                        </button>
+                        <>
+                          <button
+                            onClick={function() { handleStart(patient, 'waiting'); }}
+                            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm"
+                          >
+                            <PlayIcon className="w-4 h-4" />
+                            {self.props.lang === 'EN' ? 'Put' : 'นำเข้า'}
+                          </button>
+                          <button
+                            onClick={function() { handleStart(patient, 'active'); }}
+                            className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm"
+                          >
+                            <PlayIcon className="w-4 h-4" />
+                            {self.props.lang === 'EN' ? 'Call' : 'เรียกคิว'}
+                          </button>
+                          <button
+                            onClick={function() { handleStart(patient, 'waiting'); }}
+                            className="flex items-center gap-1.5 bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm"
+                          >
+                            <PlayIcon className="w-4 h-4" />
+                            {self.props.lang === 'EN' ? 'Skip' : 'ข้ามคิว'}
+                          </button>
+                        </>
                       )}
                       {patient.status === 'active' && (
                         <button
@@ -180,13 +196,13 @@ class PatientTable extends React.Component {
                           className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md hover:shadow-lg"
                         >
                           <CheckCircleIcon className="w-4 h-4" />
-                          ตรวจเสร็จ
+                          {self.props.lang === 'EN' ? 'Complete' : 'ตรวจเสร็จ'}
                         </button>
                       )}
                       {patient.status === 'completed' && (
                         <span className="text-green-600 font-semibold flex items-center gap-2">
                           <CheckCircleIcon className="w-5 h-5" />
-                          เสร็จสิ้น
+                          {self.props.lang === 'EN' ? 'Done' : 'เสร็จสิ้น'}
                         </span>
                       )}
                     </div>
