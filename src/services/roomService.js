@@ -32,7 +32,7 @@ class RoomService {
   // Get active examination rooms only
   async getActiveExaminationRooms() {
     try {
-      const response = await fetch(`${this.baseURL}/rooms?status=active`, {
+      const response = await fetch(`${this.baseURL}/rooms/examinationlist?status=active`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -74,12 +74,38 @@ class RoomService {
     }
   }
 
+  // Get station list
+  async getStationList() {
+    try {
+      const url = `${this.baseURL}/rooms/stationlist`;
+      console.log('Fetching station list from:', url);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Raw API response:', data);
+      const list = Array.isArray(data) ? data : (Array.isArray(data && data.data) ? data.data : []);
+      console.log('Parsed station list:', list);
+      return list;
+    } catch (error) {
+      console.error('Error fetching station list:', error);
+      throw error;
+    }
+  }
+
   // Mock data for development/testing
   getMockRooms() {
     return [
       { 
         id: 1, 
-        room_code: 'A101', 
         room_name: 'ห้องตรวจทั่วไป 1', 
         capacity: 1, 
         status: 'active',
@@ -88,7 +114,6 @@ class RoomService {
       },
       { 
         id: 2, 
-        room_code: 'A102', 
         room_name: 'ห้องตรวจโรคหัวใจ', 
         capacity: 1, 
         status: 'active',
@@ -97,7 +122,6 @@ class RoomService {
       },
       { 
         id: 3, 
-        room_code: 'A103', 
         room_name: 'ห้องตรวจเด็ก', 
         capacity: 1, 
         status: 'active',
@@ -106,7 +130,6 @@ class RoomService {
       },
       { 
         id: 4, 
-        room_code: 'B101', 
         room_name: 'ห้องตรวจทั่วไป 2', 
         capacity: 1, 
         status: 'active',
@@ -115,7 +138,6 @@ class RoomService {
       },
       { 
         id: 5, 
-        room_code: 'B102', 
         room_name: 'ห้องตรวจตา', 
         capacity: 1, 
         status: 'active',
@@ -124,7 +146,6 @@ class RoomService {
       },
       { 
         id: 6, 
-        room_code: 'C101', 
         room_name: 'ห้องตรวจผิวหนัง', 
         capacity: 1, 
         status: 'active',
@@ -133,7 +154,6 @@ class RoomService {
       },
       { 
         id: 7, 
-        room_code: 'C102', 
         room_name: 'ห้องตรวจหูคอจมูก', 
         capacity: 1, 
         status: 'active',
@@ -142,7 +162,6 @@ class RoomService {
       },
       { 
         id: 8, 
-        room_code: 'D101', 
         room_name: 'ห้องตรวจกระดูก', 
         capacity: 1, 
         status: 'active',

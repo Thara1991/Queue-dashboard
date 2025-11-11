@@ -14,12 +14,6 @@ const CheckCircleIcon = ({ className }) => (
   </svg>
 );
 
-const ClockIcon = ({ className }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/>
-  </svg>
-);
-
 const UserIcon = ({ className }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -32,9 +26,9 @@ const CalendarIcon = ({ className }) => (
   </svg>
 );
 
-const MapPinIcon = ({ className }) => (
+const ClockIcon = ({ className }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/>
   </svg>
 );
 
@@ -47,6 +41,10 @@ class PatientTable extends React.Component {
         return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-300';
+      case 'ADD':
+        return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'CALL':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300';
     }
@@ -60,9 +58,55 @@ class PatientTable extends React.Component {
         return this.props.lang === 'EN' ? 'Active' : 'กำลังตรวจ';
       case 'completed':
         return this.props.lang === 'EN' ? 'Completed' : 'ตรวจเสร็จแล้ว';
+      case 'ADD':
+        return 'ADD';
+      case 'CALL':
+        return 'CALL';
       default:
         return status;
     }
+  }
+
+  formatDate(dateString) {
+    if (!dateString || dateString === '-') return '-';
+    
+    // Handle YYYYMMDD format (e.g., "20251008")
+    if (dateString.length === 8 && /^\d+$/.test(dateString)) {
+      const year = dateString.substring(0, 4);
+      const month = dateString.substring(4, 6);
+      const day = dateString.substring(6, 8);
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Handle YYYY-MM-DD format (e.g., "2025-10-08")
+    if (dateString.includes('-')) {
+      const parts = dateString.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+    
+    // Return as is if format is not recognized
+    return dateString;
+  }
+
+  formatTime(timeString) {
+    if (!timeString || timeString === '-') return '-';
+    
+    // Handle HHMM format (e.g., "0848")
+    if (timeString.length === 4 && /^\d+$/.test(timeString)) {
+      const hours = timeString.substring(0, 2);
+      const minutes = timeString.substring(2, 4);
+      return `${hours}:${minutes}`;
+    }
+    
+    // Handle HH:MM format (already formatted)
+    if (timeString.includes(':')) {
+      return timeString;
+    }
+    
+    // Return as is if format is not recognized
+    return timeString;
   }
 
   render() {
@@ -125,81 +169,83 @@ class PatientTable extends React.Component {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {patient.status === 'waiting' ? (
-                      <EditableRoomCell 
-                        patient={patient} 
-                        onRoomChange={onRoomChange}
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <MapPinIcon className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="text-gray-900 font-semibold">{patient.room}</div>
-                          {patient.roomName && (
-                            <div className="text-xs text-gray-500">{patient.roomName}</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <EditableRoomCell 
+                      patient={patient} 
+                      onRoomChange={onRoomChange}
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{patient.date}</span>
+                      <span className="text-sm text-gray-600">{self.formatDate(patient.pdate || patient.date)}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <ClockIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{patient.time}</span>
+                      <span className="text-sm text-gray-600">{self.formatTime(patient.ptime || patient.time)}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm text-gray-700">{patient.station}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={'px-3 py-1 rounded-full text-xs font-semibold border ' + self.getStatusColor(patient.status)}>
+                    <span className={'px-3 py-1 rounded-full text-xs font-semibold border ' + self.getStatusColor(patient.status) + (patient.status === 'CALL' ? ' animate-pulse' : '')}>
                       {self.getStatusText(patient.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex gap-2">
-                      {patient.status === 'waiting' && (
-                        <>
-                          <button
-                            onClick={function() { handleStart(patient, 'waiting'); }}
-                            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm"
-                          >
-                            <PlayIcon className="w-4 h-4" />
-                            {self.props.lang === 'EN' ? 'Put' : 'นำเข้า'}
-                          </button>
-                          <button
-                            onClick={function() { handleStart(patient, 'active'); }}
-                            className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm"
-                          >
-                            <PlayIcon className="w-4 h-4" />
-                            {self.props.lang === 'EN' ? 'Call' : 'เรียกคิว'}
-                          </button>
-                          <button
-                            onClick={function() { handleStart(patient, 'waiting'); }}
-                            className="flex items-center gap-1.5 bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm"
-                          >
-                            <PlayIcon className="w-4 h-4" />
-                            {self.props.lang === 'EN' ? 'Skip' : 'ข้ามคิว'}
-                          </button>
-                        </>
-                      )}
-                      {patient.status === 'active' && (
+                      {patient.status !== 'IN' && patient.status !== 'FIN' && (function() {
+                        const hasRoom = patient.room !== 0 && patient.room !== '0' && patient.room !== null && typeof patient.room !== 'undefined';
+                        const handleButtonClick = (fstatus) => {
+                          if (hasRoom) {
+                            handleStart(patient, fstatus);
+                          } else {
+                            alert(self.props.lang === 'EN' ? 'Please select a room first!' : 'กรุณาเลือกห้องตรวจก่อน!');
+                          }
+                        };
+                        
+                        return (
+                          <>
+                            <button
+                              onClick={function() { handleButtonClick('CALL'); }}
+                              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm " + (!hasRoom ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60" : "bg-indigo-500 hover:bg-indigo-600 text-white")}
+                              title={!hasRoom ? (self.props.lang === 'EN' ? 'Please select a room first' : 'กรุณาเลือกห้องตรวจก่อน') : ''}
+                            >
+                              <PlayIcon className="w-4 h-4" />
+                              {self.props.lang === 'EN' ? 'Call' : 'เรียกคิว'}
+                            </button>
+                            <button
+                              onClick={function() { handleButtonClick('IN'); }}
+                              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm " + (!hasRoom ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60" : "bg-blue-500 hover:bg-blue-600 text-white")}
+                              title={!hasRoom ? (self.props.lang === 'EN' ? 'Please select a room first' : 'กรุณาเลือกห้องตรวจก่อน') : ''}
+                            >
+                              <PlayIcon className="w-4 h-4" />
+                              {self.props.lang === 'EN' ? 'Put' : 'นำเข้า'}
+                            </button>
+                            <button
+                              onClick={function() { handleButtonClick('SKIP'); }}
+                              className={"flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors shadow-md hover:shadow-lg text-sm " + (!hasRoom ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60" : "bg-gray-500 hover:bg-gray-600 text-white")}
+                              title={!hasRoom ? (self.props.lang === 'EN' ? 'Please select a room first' : 'กรุณาเลือกห้องตรวจก่อน') : ''}
+                            >
+                              <PlayIcon className="w-4 h-4" />
+                              {self.props.lang === 'EN' ? 'Skip' : 'ข้ามคิว'}
+                            </button>
+                          </>
+                        );
+                      })()}
+                      {patient.status === 'IN' && (
                         <button
                           // onClick={function() { handleFinish(patient.id); }}
-                          onClick={function() { handleStart(patient, 'completed'); }}
+                          onClick={function() { handleStart(patient, 'FIN'); }}
                           className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md hover:shadow-lg"
                         >
                           <CheckCircleIcon className="w-4 h-4" />
                           {self.props.lang === 'EN' ? 'Complete' : 'ตรวจเสร็จ'}
                         </button>
                       )}
-                      {patient.status === 'completed' && (
+                      {patient.status === 'FIN' && (
                         <span className="text-green-600 font-semibold flex items-center gap-2">
                           <CheckCircleIcon className="w-5 h-5" />
                           {self.props.lang === 'EN' ? 'Done' : 'เสร็จสิ้น'}

@@ -12,7 +12,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
   
-  @keyframes pulse {
+@keyframes pulse {
     0%, 100% {
       opacity: 1;
     }
@@ -23,4 +23,26 @@
   
   .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }  
+  }
+  
+  @keyframes callPulse {
+    0%, 100% {
+      background-color: #bfdbfe;
+      color: #1d4ed8;
+      box-shadow: 0 0 0 rgba(59, 130, 246, 0.35);
+    }
+    50% {
+      background-color: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.55);
+    }
+  }
+
+  .call-status {
+    background-color: #bfdbfe;
+    color: #1d4ed8;
+  }
+
+  .call-pulse {
+    animation: callPulse 1.2s ease-in-out infinite;
+  }

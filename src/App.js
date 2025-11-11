@@ -5,6 +5,7 @@ import Statistics from './components/Statistics';
 import TabNavigation from './components/TabNavigation';
 import PatientTable from './components/PatientTable';
 import AddPatientModal from './components/AddPatientModal';
+import RoomInfoModal from './components/RoomInfoModal';
 
 class App extends React.Component {
   constructor(props) {
@@ -14,7 +15,9 @@ class App extends React.Component {
       currentPatient: null,
       activeTab: 'waiting',
       showAddPatientModal: false,
-      selectedDate: '2025-10-08'
+      selectedDate: '2025-10-08',
+      selectedStationCode: '90',
+      showRoomInfo: false
     };
   }
 
@@ -91,13 +94,28 @@ class App extends React.Component {
     
     // this.setState({ patients: mockData });
 
-    // โหลดข้อมูลครั้งแรกตามวันที่ที่เลือก
-    this.fetchPatients(this.state.selectedDate);
+    // โหลดข้อมูลครั้งแรกตามวันที่และสถานีที่เลือก
+    this.fetchPatients(this.state.selectedDate, this.state.selectedStationCode);
   }
 
-  fetchPatients = (date) => {
+  fetchPatients = (date, stationCode) => {
     const acpDte = (date || '').replace(/-/g, '');
-    const url = `http://localhost:3002/api/v1/kiosk/getPatientList?AcpDte=${encodeURIComponent(acpDte)}`;
+    const effectiveStation = stationCode !== undefined ? stationCode : this.state.selectedStationCode;
+    const params = new URLSearchParams();
+
+    if (acpDte) {
+      params.append('AcpDte', acpDte);
+    }
+
+    if (effectiveStation) {
+      params.append('station', effectiveStation);
+    }
+
+    const queryString = params.toString();
+    const url = queryString 
+      ? `http://localhost:3002/api/v1/kiosk/getPatientList?${queryString}`
+      : 'http://localhost:3002/api/v1/kiosk/getPatientList';
+    console.log('Fetching patient list with params:', queryString);
     return fetch(url)
       .then(response => response.json())
       .then(data => this.setState({ patients: data.data || [] }))
@@ -106,7 +124,15 @@ class App extends React.Component {
 
   handleStart = async (patient, fstatus) => {
     try {
-      const response = await fetch('http://localhost:3002/api/v1/queues', {
+      const url = 'http://localhost:3002/api/v1/queues/EnterQueue';
+      console.log('Full API path: POST', url);
+      console.log('Request body:', JSON.stringify({
+        ...patient,
+        room_id: patient.room,
+        status: fstatus
+      }));
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -136,10 +162,11 @@ class App extends React.Component {
       }
 
       const data = await response.json();
+      console.log('API response:', data);
 
       // Update local state according to requested fstatus
       this.setState({
-        currentPatient: fstatus === 'active' ? patient : this.state.currentPatient,
+        currentPatient: fstatus === 'CALL' ? patient : this.state.currentPatient,
         patients: this.state.patients.map(function(p) {
           if (p.id === patient.id) {
             return Object.assign({}, p, { status: fstatus });
@@ -208,6 +235,10 @@ class App extends React.Component {
     this.setState({ showAddPatientModal: !this.state.showAddPatientModal });
   }
 
+  toggleRoomInfo = () => {
+    this.setState({ showRoomInfo: !this.state.showRoomInfo });
+  }
+
   // Removed old refresh simulation; data now refreshes on date change
 
   handleRoomChange = (patientId, newRoom) => {
@@ -216,8 +247,9 @@ class App extends React.Component {
         if (patient.id === patientId) {
           return {
             ...patient,
-            room: newRoom.room_code,
-            roomName: newRoom.room_name
+            room: newRoom.id,
+            roomName: newRoom.room_name,
+            status: 'ADD'
           };
         }
         return patient;
@@ -227,8 +259,16 @@ class App extends React.Component {
   }
 
   handleDateChange = (newDate) => {
-    this.setState({ selectedDate: newDate });
-    this.fetchPatients(newDate);
+    this.setState({ selectedDate: newDate }, () => {
+      this.fetchPatients(newDate);
+    });
+  }
+
+  handleStationChange = (station) => {
+    const stationCode = station && station.Station_Code != null ? String(station.Station_Code) : '';
+    this.setState({ selectedStationCode: stationCode }, () => {
+      this.fetchPatients(this.state.selectedDate, stationCode);
+    });
   }
 
   handleToggleLang = (lang) => {
@@ -236,20 +276,31 @@ class App extends React.Component {
   }
 
   countByStatus = (status) => {
-    return this.state.patients.filter(function(p) {
-      return p.status === status;
-    }).length;
+    if (status === 'waiting') {
+      return this.state.patients.filter(function(p) {
+        return p.status !== 'FIN' && p.status !== 'SKIP' && p.status !== 'IN';
+      }).length;
+    } else if (status === 'active') {
+      return this.state.patients.filter(function(p) {
+        return p.status === 'IN';
+      }).length;
+    } else if (status === 'completed') {
+      return this.state.patients.filter(function(p) {
+        return p.status === 'FIN';
+      }).length;
+    }
+    return 0;
   }
 
   getFilteredPatients = () => {
     const activeTab = this.state.activeTab;
     return this.state.patients.filter(function(p) {
       if (activeTab === 'waiting') {
-        return p.status === 'waiting';
+        return p.status !== 'FIN' && p.status !== 'SKIP' && p.status !== 'IN';
       } else if (activeTab === 'active') {
-        return p.status === 'active';
+        return p.status === 'IN';
       } else if (activeTab === 'completed') {
-        return p.status === 'completed';
+        return p.status === 'FIN';
       }
       return true;
     });
@@ -258,15 +309,27 @@ class App extends React.Component {
   render() {
     const filteredPatients = this.getFilteredPatients();
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Header typeof:', typeof Header, Header && Header.name);
+      console.log('CurrentPatientAlert typeof:', typeof CurrentPatientAlert);
+      console.log('Statistics typeof:', typeof Statistics);
+      console.log('TabNavigation typeof:', typeof TabNavigation);
+      console.log('PatientTable typeof:', typeof PatientTable);
+      console.log('AddPatientModal typeof:', typeof AddPatientModal);
+      console.log('RoomInfoModal typeof:', typeof RoomInfoModal);
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
         <div className="max-w-7xl mx-auto">
           <Header 
-            onAddPatient={this.toggleAddPatientModal}
             selectedDate={this.state.selectedDate}
             onDateChange={this.handleDateChange}
             lang={this.state.lang || 'TH'}
             onToggleLang={this.handleToggleLang}
+            onToggleRoomInfo={this.toggleRoomInfo}
+            onStationChange={this.handleStationChange}
+            initialStationCode={this.state.selectedStationCode}
           />
           
           <CurrentPatientAlert currentPatient={this.state.currentPatient} />
@@ -299,6 +362,12 @@ class App extends React.Component {
           isOpen={this.state.showAddPatientModal}
           onClose={this.toggleAddPatientModal}
           onAddPatient={this.handleAddPatient}
+        />
+
+        <RoomInfoModal
+          isOpen={this.state.showRoomInfo}
+          onClose={this.toggleRoomInfo}
+          lang={this.state.lang || 'TH'}
         />
       </div>
     );

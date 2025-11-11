@@ -1,4 +1,5 @@
 import React from 'react';
+import roomService from '../services/roomService';
 
 // Custom SVG Icons
 const PlusIcon = ({ className }) => (
@@ -6,7 +7,6 @@ const PlusIcon = ({ className }) => (
     <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
   </svg>
 );
-
 
 const CalendarIcon = ({ className }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
@@ -18,6 +18,79 @@ class Header extends React.Component {
   constructor(props) {
     super(props);
     this.dateInputRef = React.createRef();
+    this.state = {
+      stations: [],
+      selectedStation: null,
+      loading: true
+    };
+  }
+
+  normalizeStationCode(code) {
+    if (code === undefined || code === null) {
+      return '';
+    }
+    return String(code).trim();
+  }
+
+  componentDidMount() {
+    this.fetchStations();
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.initialStationCode !== this.props.initialStationCode && this.state.stations.length > 0) {
+      const targetCode = this.normalizeStationCode(this.props.initialStationCode);
+      const matchedStation = this.state.stations.find((station) => {
+        return this.normalizeStationCode(station.Station_Code) === targetCode;
+      });
+
+      if (matchedStation && (!this.state.selectedStation || String(this.state.selectedStation.Station_Code) !== targetCode)) {
+        this.setState({ selectedStation: matchedStation });
+      }
+    }
+  }
+
+  fetchStations = async () => {
+    try {
+      this.setState({ loading: true });
+      const stations = await roomService.getStationList();
+      this.setState({ stations });
+      
+      const preferredCode = this.normalizeStationCode(this.props.initialStationCode) || '90';
+      const defaultStation = stations.find((station) => {
+        return this.normalizeStationCode(station.Station_Code) === preferredCode;
+      }) || stations.find((station) => {
+        return this.normalizeStationCode(station.Station_Code) === '90';
+      }) || stations[0] || null;
+
+      if (defaultStation) {
+        this.setState({ selectedStation: defaultStation });
+        const defaultCode = this.normalizeStationCode(defaultStation.Station_Code);
+        if (this.props.onStationChange && defaultCode !== this.normalizeStationCode(this.props.initialStationCode)) {
+          this.props.onStationChange(defaultStation);
+        }
+      } else {
+        this.setState({ selectedStation: null });
+      }
+    } catch (error) {
+      console.error('Error fetching stations:', error);
+      this.setState({ stations: [], loading: false });
+    } finally {
+      this.setState({ loading: false });
+    }
+  }
+
+  handleStationChange = (e) => {
+    const stationCode = this.normalizeStationCode(e.target.value);
+    const selectedStation = this.state.stations.find(station => 
+      this.normalizeStationCode(station.Station_Code) === stationCode
+    );
+    
+    if (selectedStation) {
+      this.setState({ selectedStation });
+      if (this.props.onStationChange) {
+        this.props.onStationChange(selectedStation);
+      }
+    }
   }
 
   focusDateInput = () => {
@@ -41,9 +114,28 @@ class Header extends React.Component {
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
               {this.props.lang === 'EN' ? 'Patient Queue Management' : 'ระบบจัดการคิวผู้ป่วย'}
             </h1>
-            <p className="text-gray-600">
-              {this.props.lang === 'EN' ? 'Manage Dashboard Queue System' : 'จัดการแดชบอร์ดระบบคิว'}
-            </p>
+            <select
+              value={this.state.selectedStation ? this.normalizeStationCode(this.state.selectedStation.Station_Code) : ''}
+              onChange={this.handleStationChange}
+              disabled={this.state.loading}
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              {this.state.loading ? (
+                <option value="">{this.props.lang === 'EN' ? 'Loading...' : 'กำลังโหลด...'}</option>
+              ) : this.state.stations.length === 0 ? (
+                <option value="">{this.props.lang === 'EN' ? 'No stations available' : 'ไม่มีสถานี'}</option>
+              ) : (
+                this.state.stations.map((station, index) => {
+                  const stationCode = this.normalizeStationCode(station.Station_Code);
+                  const stationName = station.Station_Name || `Station ${stationCode || index}`;
+                  return (
+                    <option key={stationCode || `station-${index}`} value={stationCode}>
+                      {stationName}
+                    </option>
+                  );
+                })
+              )}
+            </select>
           </div>
           
           <div className="flex items-center gap-3">
@@ -59,15 +151,13 @@ class Header extends React.Component {
                 className={`px-3 py-2 text-sm font-semibold ${this.props.lang === 'EN' ? 'bg-gray-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
               >EN</button>
             </div>
-            {this.props.onAddPatient && (
-              <button
-                onClick={this.props.onAddPatient}
-                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors shadow-md hover:shadow-lg"
-              >
-                <PlusIcon className="w-5 h-5" />
-                <span>{this.props.lang === 'EN' ? 'Add Patient' : 'เพิ่มผู้ป่วย'}</span>
-              </button>
-            )}
+            <button
+              onClick={this.props.onToggleRoomInfo}
+              className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors shadow-md hover:shadow-lg"
+            >
+              <PlusIcon className="w-5 h-5" />
+              <span>{this.props.lang === 'EN' ? 'Doctor Assign' : 'แพทย์ตรวจ'}</span>
+            </button>
             <div className="flex items-center gap-2">
               <div
                 className="px-3 py-3 rounded-lg border border-gray-300 text-gray-700 shadow-md focus-within:ring-2 focus-within:ring-blue-400 cursor-pointer"

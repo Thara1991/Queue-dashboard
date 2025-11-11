@@ -42,9 +42,41 @@ class EditableRoomCell extends React.Component {
   componentDidMount() {
     this.loadRooms();
     const p = this.props.patient;
-    const noRoom = !p || p.room === 0 || p.room === '0' || p.room === null || typeof p.room === 'undefined';
+    const roomId = p.room_id || p.room;
+    const noRoom = !p || roomId === 0 || roomId === '0' || roomId === null || typeof roomId === 'undefined' || roomId === '';
     if (noRoom) {
       this.setState({ isEditing: true });
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    // If patient changed and we have rooms loaded, rematch the room
+    if (prevProps.patient.id !== this.props.patient.id || 
+        prevProps.patient.room_id !== this.props.patient.room_id ||
+        prevProps.patient.room !== this.props.patient.room) {
+      const { patient } = this.props;
+      const { rooms } = this.state;
+      const roomId = patient.room_id || patient.room;
+      
+      let matchedRoom = null;
+      let matchedIndex = null;
+      
+      if (roomId && rooms && rooms.length > 0) {
+        matchedIndex = rooms.findIndex(function(room) {
+          return room.id == roomId || room.id === roomId;
+        });
+        if (matchedIndex >= 0) {
+          matchedRoom = rooms[matchedIndex];
+        }
+      }
+      
+      const noRoom = !patient || roomId === 0 || roomId === '0' || roomId === null || typeof roomId === 'undefined' || roomId === '';
+      
+      this.setState({
+        selectedRoom: matchedRoom,
+        selectedRoomIndex: matchedIndex,
+        isEditing: noRoom && !this.state.isEditing ? true : this.state.isEditing
+      });
     }
   }
 
@@ -60,9 +92,26 @@ class EditableRoomCell extends React.Component {
         rooms = roomService.getMockRooms();
       }
       
+      // Match patient room_id with rooms list
+      const { patient } = this.props;
+      const roomId = patient.room_id || patient.room;
+      let matchedRoom = null;
+      let matchedIndex = null;
+      
+      if (roomId && rooms && rooms.length > 0) {
+        matchedIndex = rooms.findIndex(function(room) {
+          return room.id == roomId || room.id === roomId;
+        });
+        if (matchedIndex >= 0) {
+          matchedRoom = rooms[matchedIndex];
+        }
+      }
+      
       this.setState({ 
         rooms: Array.isArray(rooms) ? rooms : [],
-        loading: false 
+        loading: false,
+        selectedRoom: matchedRoom,
+        selectedRoomIndex: matchedIndex
       });
       
     } catch (error) {
@@ -89,18 +138,66 @@ class EditableRoomCell extends React.Component {
     this.setState({ selectedRoom: room, selectedRoomIndex: index >= 0 ? index : null });
   }
 
-  handleSave = () => {
+  handleSave = async () => {
     const { selectedRoom } = this.state;
     const { patient, onRoomChange } = this.props;
     
-    if (selectedRoom && onRoomChange) {
-      onRoomChange(patient.id, selectedRoom);
+    if (!selectedRoom || !onRoomChange) {
+      return;
     }
-    
-    this.setState({ 
-      isEditing: false,
-      selectedRoom: null 
-    });
+
+    try {
+      const url = 'http://localhost:3002/api/v1/queues/EnterQueue';
+      console.log('Full API path: POST', url);
+      console.log('Request body:', JSON.stringify({
+        ...patient,
+        room_id: selectedRoom.id,
+        status: 'ADD'
+      }));
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...patient,
+          room_id: selectedRoom.id,
+          status: 'ADD'
+        })
+      });
+
+      if (!response.ok) {
+        let serverMessage = '';
+        try {
+          const errorBody = await response.json();
+          serverMessage = errorBody && (errorBody.message || errorBody.error || JSON.stringify(errorBody));
+        } catch (_) {
+          try {
+            serverMessage = await response.text();
+          } catch (_) {
+            serverMessage = '';
+          }
+        }
+        const details = serverMessage ? `: ${serverMessage}` : '';
+        throw new Error(`HTTP ${response.status}${details}`);
+      }
+
+      const data = await response.json();
+      console.log('API response:', data);
+
+      // Call onRoomChange to update local state
+      onRoomChange(patient.id, selectedRoom);
+      
+      this.setState({ 
+        isEditing: false,
+        selectedRoom: null,
+        selectedRoomIndex: null
+      });
+    } catch (error) {
+      console.error('Error EnterQueue:', error);
+      alert(`Failed to enter queue. Please try again.\n${error && error.message ? error.message : ''}`);
+    }
   }
 
   render() {
@@ -108,6 +205,15 @@ class EditableRoomCell extends React.Component {
     const { isEditing, rooms, selectedRoom, selectedRoomIndex, loading, error } = this.state;
 
     if (!isEditing) {
+      const roomId = patient.room_id || patient.room;
+      const hasRoom = roomId && roomId !== 0 && roomId !== '0' && roomId !== null && typeof roomId !== 'undefined' && roomId !== '';
+      
+      // Use matched room name if available, otherwise use patient.roomName
+      let roomDisplayName = patient.roomName;
+      if (!roomDisplayName && selectedRoom && selectedRoom.room_name) {
+        roomDisplayName = selectedRoom.room_name;
+      }
+      
       return (
         <div className="flex items-center gap-2">
           <button
@@ -121,10 +227,7 @@ class EditableRoomCell extends React.Component {
             className="cursor-pointer hover:bg-gray-50 hover:border-b-2 hover:border-blue-400 p-1.5 rounded transition-all"
             onClick={this.handleEdit}
           >
-            <div className="text-gray-900 font-semibold">{(patient.room === 0 || patient.room === '0' || patient.room === null || typeof patient.room === 'undefined') ? '-' : patient.room}</div>
-            {patient.roomName && (
-              <div className="text-xs text-gray-500">{patient.roomName}</div>
-            )}
+            <div className="text-gray-900 font-semibold">{hasRoom ? (roomDisplayName || '-') : '-'}</div>
           </div>
         </div>
       );
@@ -132,36 +235,54 @@ class EditableRoomCell extends React.Component {
 
     return (
       <div className="relative">
-        <div className="flex items-center gap-2">
-          <MapPinIcon className="w-4 h-4 text-gray-400" />
-          <div className="flex-1">
-            <select
-              value={selectedRoomIndex !== null ? selectedRoomIndex : ''}
-              onChange={(e) => {
-                const idx = parseInt(e.target.value);
-                const room = rooms[idx];
-                if (room) {
-                  // Immediately save selection and close editor
-                  const { onRoomChange } = this.props;
-                  if (onRoomChange) {
-                    onRoomChange(this.props.patient.id, room);
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="w-4 h-4 text-gray-400" />
+            <div className="flex-1">
+              <select
+                value={selectedRoomIndex !== null ? selectedRoomIndex : ''}
+                onChange={(e) => {
+                  const idx = parseInt(e.target.value);
+                  const room = rooms[idx];
+                  if (room) {
+                    this.handleRoomSelect(room);
                   }
-                  this.setState({ selectedRoom: null, selectedRoomIndex: null, isEditing: false });
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              disabled={loading}
-            >
-              <option value="">เลือกห้องตรวจ</option>
-              {rooms.map((room, index) => (
-                <option key={room.id || index} value={index}>
-                  {room.room_code} - {room.room_name}
-                </option>
-              ))}
-            </select>
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                disabled={loading}
+              >
+                <option value="">เลือกห้องตรวจ</option>
+                {rooms.map((room, index) => (
+                  <option key={room.id || index} value={index}>
+                    {room.id} - {room.room_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {selectedRoom && (
+            <div className="flex justify-end items-center gap-3 pl-6">
+              <button
+                type="button"
+                onClick={this.handleSave}
+                className="text-green-600 hover:text-green-700 p-1"
+                title="ยืนยัน"
+              >
+                <CheckIcon className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={this.handleCancel}
+                className="text-red-500 hover:text-red-600 p-1"
+                title="ยกเลิก"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
-        
+
         {error && (
           <div className="text-red-500 text-xs mt-1">{error}</div>
         )}
