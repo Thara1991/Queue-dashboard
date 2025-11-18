@@ -29,6 +29,7 @@ const XIcon = ({ className }) => (
 class EditableRoomCell extends React.Component {
   constructor(props) {
     super(props);
+    this._isMounted = false;
     this.state = {
       isEditing: false,
       rooms: [],
@@ -40,7 +41,8 @@ class EditableRoomCell extends React.Component {
   }
 
   componentDidMount() {
-    this.loadRooms();
+    this._isMounted = true;
+    this.loadRooms(this.props.stationCode);
     const p = this.props.patient;
     const roomId = p.room_id || p.room;
     const noRoom = !p || roomId === 0 || roomId === '0' || roomId === null || typeof roomId === 'undefined' || roomId === '';
@@ -49,7 +51,18 @@ class EditableRoomCell extends React.Component {
     }
   }
 
+  componentWillUnmount() {
+    this._isMounted = false;
+  }
+
   componentDidUpdate(prevProps) {
+    const prevStation = this.normalizeStationCode(prevProps.stationCode);
+    const currentStation = this.normalizeStationCode(this.props.stationCode);
+
+    if (prevStation !== currentStation) {
+      this.loadRooms(currentStation);
+    }
+
     // If patient changed and we have rooms loaded, rematch the room
     if (prevProps.patient.id !== this.props.patient.id || 
         prevProps.patient.room_id !== this.props.patient.room_id ||
@@ -80,13 +93,21 @@ class EditableRoomCell extends React.Component {
     }
   }
 
-  loadRooms = async () => {
-    this.setState({ loading: true, error: null });
+  loadRooms = async (stationCodeParam) => {
+    const targetStation = this.normalizeStationCode(
+      stationCodeParam !== undefined ? stationCodeParam : this.props.stationCode
+    );
+
+    if (this._isMounted) {
+      this.setState({ loading: true, error: null });
+    }
     
     try {
       let rooms;
       try {
-        rooms = await roomService.getActiveExaminationRooms();
+        rooms = await roomService.getActiveExaminationRooms({
+          station: targetStation || undefined
+        });
       } catch (apiError) {
         console.warn('API not available, using mock data:', apiError);
         rooms = roomService.getMockRooms();
@@ -107,19 +128,30 @@ class EditableRoomCell extends React.Component {
         }
       }
       
-      this.setState({ 
-        rooms: Array.isArray(rooms) ? rooms : [],
-        loading: false,
-        selectedRoom: matchedRoom,
-        selectedRoomIndex: matchedIndex
-      });
+      if (this._isMounted) {
+        this.setState({ 
+          rooms: Array.isArray(rooms) ? rooms : [],
+          loading: false,
+          selectedRoom: matchedRoom,
+          selectedRoomIndex: matchedIndex
+        });
+      }
       
     } catch (error) {
-      this.setState({ 
-        error: 'ไม่สามารถโหลดข้อมูลห้องตรวจได้',
-        loading: false 
-      });
+      if (this._isMounted) {
+        this.setState({ 
+          error: 'ไม่สามารถโหลดข้อมูลห้องตรวจได้',
+          loading: false 
+        });
+      }
     }
+  }
+
+  normalizeStationCode(code) {
+    if (code === undefined || code === null) {
+      return '';
+    }
+    return String(code).trim();
   }
 
   handleEdit = () => {
@@ -140,7 +172,7 @@ class EditableRoomCell extends React.Component {
 
   handleSave = async () => {
     const { selectedRoom } = this.state;
-    const { patient, onRoomChange } = this.props;
+    const { patient, onRoomChange, selectedDate } = this.props;
     
     if (!selectedRoom || !onRoomChange) {
       return;
@@ -148,23 +180,23 @@ class EditableRoomCell extends React.Component {
 
     try {
       const url = 'http://localhost:3002/api/v1/queues/EnterQueue';
-      console.log('Full API path: POST', url);
-      console.log('Request body:', JSON.stringify({
+      // Format CurDate as 'YYYYMMDD' (e.g., '20251103')
+      const curDateFormatted = (selectedDate || '').replace(/-/g, '');
+      const requestBody = {
         ...patient,
         room_id: selectedRoom.id,
-        status: 'ADD'
-      }));
+        status: 'ADD',
+        CurDate: curDateFormatted
+      };
+      console.log('Full API path: POST', url);
+      console.log('Request body:', JSON.stringify(requestBody));
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...patient,
-          room_id: selectedRoom.id,
-          status: 'ADD'
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -184,19 +216,31 @@ class EditableRoomCell extends React.Component {
       }
 
       const data = await response.json();
-      console.log('API response:', data);
+      console.log('Green checkmark clicked (room selection) - API return data:', JSON.stringify(data, null, 2));
 
-      // Call onRoomChange to update local state
-      onRoomChange(patient.id, selectedRoom);
+      // Extract queue_number from response (check multiple possible response structures)
+      let updatedQueueNumber = null;
+      if (data && data.queue_number !== undefined && data.queue_number !== null) {
+        updatedQueueNumber = data.queue_number;
+      } else if (data && data.data && data.data.queue_number !== undefined && data.data.queue_number !== null) {
+        updatedQueueNumber = data.data.queue_number;
+      }
+
+      // Call onRoomChange to update local state, passing queueNumber if available
+      onRoomChange(patient.id, selectedRoom, updatedQueueNumber);
       
-      this.setState({ 
-        isEditing: false,
-        selectedRoom: null,
-        selectedRoomIndex: null
-      });
+      if (this._isMounted) {
+        this.setState({ 
+          isEditing: false,
+          selectedRoom: null,
+          selectedRoomIndex: null
+        });
+      }
     } catch (error) {
-      console.error('Error EnterQueue:', error);
-      alert(`Failed to enter queue. Please try again.\n${error && error.message ? error.message : ''}`);
+      if (this._isMounted) {
+        console.error('Error EnterQueue:', error);
+        alert(`Failed to enter queue. Please try again.\n${error && error.message ? error.message : ''}`);
+      }
     }
   }
 
@@ -233,10 +277,12 @@ class EditableRoomCell extends React.Component {
       );
     }
 
+    const { isWaitingTab } = this.props;
+    
     return (
       <div className="relative">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
+        <div className={isWaitingTab ? "flex items-center gap-2" : "flex flex-col gap-1"}>
+          <div className="flex items-center gap-2 flex-1">
             <MapPinIcon className="w-4 h-4 text-gray-400" />
             <div className="flex-1">
               <select
@@ -262,7 +308,7 @@ class EditableRoomCell extends React.Component {
           </div>
 
           {selectedRoom && (
-            <div className="flex justify-end items-center gap-3 pl-6">
+            <div className={`flex items-center gap-3 ${isWaitingTab ? '' : 'justify-end pl-6'}`}>
               <button
                 type="button"
                 onClick={this.handleSave}

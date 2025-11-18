@@ -13,9 +13,9 @@ const UserIcon = ({ className }) => (
   </svg>
 );
 
-const CheckCircleIcon = ({ className }) => (
+const SkipIcon = ({ className }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
   </svg>
 );
 
@@ -61,18 +61,18 @@ class Statistics extends React.Component {
 
         <div 
           className={'bg-white rounded-lg shadow p-6 cursor-pointer transform transition-all hover:scale-105 ' + 
-            (activeTab === 'completed' ? 'ring-4 ring-green-400' : '')}
-          onClick={function() { setActiveTab('completed'); }}
+            (activeTab === 'skip' ? 'ring-4 ring-orange-400' : '')}
+          onClick={function() { setActiveTab('skip'); }}
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">{lang === 'EN' ? 'Complete' : 'ตรวจเสร็จแล้ว'}</p>
-              <p className="text-3xl font-bold text-green-600">
-                {countByStatus('completed')}
+              <p className="text-gray-600 text-sm">{lang === 'EN' ? 'Skip' : 'ข้ามคิว'}</p>
+              <p className="text-3xl font-bold text-orange-600">
+                {countByStatus('skip')}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{lang === 'EN' ? 'Complete' : 'เสร็จสิ้น'}</p>
+              <p className="text-xs text-gray-500 mt-1">{lang === 'EN' ? 'Skip' : 'ข้ามคิว'}</p>
             </div>
-            <CheckCircleIcon className="w-12 h-12 text-green-500" />
+            <SkipIcon className="w-12 h-12 text-orange-500" />
           </div>
         </div>
       </div>

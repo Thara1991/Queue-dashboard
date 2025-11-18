@@ -30,9 +30,22 @@ class RoomService {
   }
 
   // Get active examination rooms only
-  async getActiveExaminationRooms() {
+  async getActiveExaminationRooms(options = {}) {
+    const { status = 'active', station } = options || {};
     try {
-      const response = await fetch(`${this.baseURL}/rooms/examinationlist?status=active`, {
+      const params = new URLSearchParams();
+      if (status) {
+        params.append('status', status);
+      }
+      if (station) {
+        params.append('station', station);
+      }
+      const queryString = params.toString();
+      const url = queryString
+        ? `${this.baseURL}/rooms/examinationlist?${queryString}`
+        : `${this.baseURL}/rooms/examinationlist`;
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -186,6 +186,7 @@ class AddPatientModal extends React.Component {
                 onRoomSelect={this.handleRoomSelect}
                 placeholder="เลือกห้องตรวจ"
                 className={errors.selectedRoom ? 'border-red-300' : ''}
+                stationCode={this.props.stationCode}
               />
               {errors.selectedRoom && (
                 <p className="text-red-500 text-sm mt-1">{errors.selectedRoom}</p>

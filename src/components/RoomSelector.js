@@ -27,25 +27,49 @@ class RoomSelector extends React.Component {
   }
 
   componentDidMount() {
-    this.loadRooms();
+    this.loadRooms(this.props.stationCode);
   }
 
-  loadRooms = async () => {
+  componentDidUpdate(prevProps) {
+    if (this.normalizeStationCode(prevProps.stationCode) !== this.normalizeStationCode(this.props.stationCode)) {
+      this.loadRooms(this.props.stationCode);
+    }
+  }
+
+  loadRooms = async (stationCodeParam) => {
+    const targetStation = this.normalizeStationCode(
+      stationCodeParam !== undefined ? stationCodeParam : this.props.stationCode
+    );
+
     this.setState({ loading: true, error: null });
     
     try {
       // Try to fetch from API first, fallback to mock data
       let rooms;
       try {
-        rooms = await roomService.getActiveExaminationRooms();
+        rooms = await roomService.getActiveExaminationRooms({
+          station: targetStation || undefined
+        });
       } catch (apiError) {
         console.warn('API not available, using mock data:', apiError);
         rooms = roomService.getMockRooms();
       }
       
+      const { selectedRoom } = this.state;
+      let nextSelectedRoom = selectedRoom;
+      if (selectedRoom && selectedRoom.id) {
+        const stillExists = Array.isArray(rooms) && rooms.some(function(room) {
+          return room.id === selectedRoom.id;
+        });
+        if (!stillExists) {
+          nextSelectedRoom = '';
+        }
+      }
+      
       this.setState({ 
         rooms,
-        loading: false 
+        loading: false,
+        selectedRoom: nextSelectedRoom
       });
       
     } catch (error) {
@@ -146,5 +170,12 @@ class RoomSelector extends React.Component {
     );
   }
 }
+
+RoomSelector.prototype.normalizeStationCode = function(code) {
+  if (code === undefined || code === null) {
+    return '';
+  }
+  return String(code).trim();
+};
 
 export default RoomSelector;

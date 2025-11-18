@@ -15,10 +15,12 @@ class App extends React.Component {
       currentPatient: null,
       activeTab: 'waiting',
       showAddPatientModal: false,
-      selectedDate: '2025-10-08',
+      selectedDate: '2025-11-03',
       selectedStationCode: '90',
-      showRoomInfo: false
+      showRoomInfo: false,
+      allRoomsExpanded: false
     };
+    this.toggleAllRoomsCallback = null;
   }
 
   componentDidMount() {
@@ -76,7 +78,7 @@ class App extends React.Component {
         roomName: 'ห้องตรวจโรคหัวใจ',
         pdate: '2025-10-08',
         station: 'ห้องตรวจทั่วไป',
-        status: 'completed',
+        status: 'SKIP',
         time: '08:30'
       },
       {
@@ -87,7 +89,7 @@ class App extends React.Component {
         roomName: 'ห้องตรวจเด็ก',
         pdate: '2025-10-08',
         station: 'ห้องตรวจเด็ก',
-        status: 'completed',
+        status: 'SKIP',
         time: '08:45'
       }
     ];
@@ -115,7 +117,7 @@ class App extends React.Component {
     const url = queryString 
       ? `http://localhost:3002/api/v1/kiosk/getPatientList?${queryString}`
       : 'http://localhost:3002/api/v1/kiosk/getPatientList';
-    console.log('Fetching patient list with params:', queryString);
+    console.log('Full API path: GET', url);
     return fetch(url)
       .then(response => response.json())
       .then(data => this.setState({ patients: data.data || [] }))
@@ -125,23 +127,23 @@ class App extends React.Component {
   handleStart = async (patient, fstatus) => {
     try {
       const url = 'http://localhost:3002/api/v1/queues/EnterQueue';
-      console.log('Full API path: POST', url);
-      console.log('Request body:', JSON.stringify({
+      // Format CurDate as 'YYYYMMDD' (e.g., '20251103')
+      const curDateFormatted = (this.state.selectedDate || '').replace(/-/g, '');
+      const requestBody = {
         ...patient,
         room_id: patient.room,
-        status: fstatus
-      }));
+        status: fstatus,
+        CurDate: curDateFormatted
+      };
+      console.log('Full API path: POST', url);
+      console.log('Request body:', JSON.stringify(requestBody));
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...patient,
-          room_id: patient.room,
-          status: fstatus
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -162,14 +164,32 @@ class App extends React.Component {
       }
 
       const data = await response.json();
-      console.log('API response:', data);
+      console.log('API response from EnterQueue:', data);
+      if (fstatus === 'IN') {
+        console.log('Complete button clicked - API return data:', JSON.stringify(data, null, 2));
+      }
 
-      // Update local state according to requested fstatus
+      // Extract exam_time from response (check multiple possible response structures)
+      let examTime = null;
+      if (data && data.exam_time !== undefined && data.exam_time !== null) {
+        examTime = data.exam_time;
+      } else if (data && data.data && data.data.exam_time !== undefined && data.data.exam_time !== null) {
+        examTime = data.data.exam_time;
+      } else if (data && data.patient && data.patient.exam_time !== undefined && data.patient.exam_time !== null) {
+        examTime = data.patient.exam_time;
+      }
+
+      // Update local state according to requested fstatus and exam_time
+      const updateData = { status: fstatus };
+      if (examTime !== null && fstatus === 'IN') {
+        updateData.exam_time = examTime;
+      }
+
       this.setState({
         currentPatient: fstatus === 'CALL' ? patient : this.state.currentPatient,
         patients: this.state.patients.map(function(p) {
           if (p.id === patient.id) {
-            return Object.assign({}, p, { status: fstatus });
+            return Object.assign({}, p, updateData);
           }
           return p;
         })
@@ -197,7 +217,7 @@ class App extends React.Component {
     this.setState({
       patients: this.state.patients.map(function(p) {
         if (p.id === patientId) {
-          return Object.assign({}, p, { status: 'completed' });
+          return Object.assign({}, p, { status: 'SKIP' });
         }
         return p;
       }),
@@ -206,7 +226,20 @@ class App extends React.Component {
   }
 
   setActiveTab = (tab) => {
-    this.setState({ activeTab: tab });
+    // If clicking the active tab while it's already active, toggle all rooms
+    if (tab === 'active' && this.state.activeTab === 'active' && this.toggleAllRoomsCallback) {
+      this.toggleAllRoomsCallback();
+    } else {
+      this.setState({ activeTab: tab });
+    }
+  }
+
+  setToggleAllRoomsCallback = (callback) => {
+    this.toggleAllRoomsCallback = callback;
+  }
+
+  setAllRoomsExpanded = (expanded) => {
+    this.setState({ allRoomsExpanded: expanded });
   }
 
   handleAddPatient = (newPatient) => {
@@ -241,16 +274,20 @@ class App extends React.Component {
 
   // Removed old refresh simulation; data now refreshes on date change
 
-  handleRoomChange = (patientId, newRoom) => {
+  handleRoomChange = (patientId, newRoom, queueNumber = null) => {
     this.setState({
       patients: this.state.patients.map(patient => {
         if (patient.id === patientId) {
-          return {
+          const update = {
             ...patient,
             room: newRoom.id,
             roomName: newRoom.room_name,
             status: 'ADD'
           };
+          if (queueNumber !== null && queueNumber !== undefined) {
+            update.queueNumber = queueNumber;
+          }
+          return update;
         }
         return patient;
       })
@@ -278,15 +315,15 @@ class App extends React.Component {
   countByStatus = (status) => {
     if (status === 'waiting') {
       return this.state.patients.filter(function(p) {
-        return p.status !== 'FIN' && p.status !== 'SKIP' && p.status !== 'IN';
+        return p.status === '';
       }).length;
     } else if (status === 'active') {
       return this.state.patients.filter(function(p) {
-        return p.status === 'IN';
+        return p.status === 'ADD' || p.status === 'IN' || p.status === 'CALL';
       }).length;
-    } else if (status === 'completed') {
+    } else if (status === 'skip') {
       return this.state.patients.filter(function(p) {
-        return p.status === 'FIN';
+        return p.status === 'SKIP';
       }).length;
     }
     return 0;
@@ -296,11 +333,11 @@ class App extends React.Component {
     const activeTab = this.state.activeTab;
     return this.state.patients.filter(function(p) {
       if (activeTab === 'waiting') {
-        return p.status !== 'FIN' && p.status !== 'SKIP' && p.status !== 'IN';
+        return p.status === '';
       } else if (activeTab === 'active') {
-        return p.status === 'IN';
-      } else if (activeTab === 'completed') {
-        return p.status === 'FIN';
+        return p.status === 'ADD' || p.status === 'IN' || p.status === 'CALL';
+      } else if (activeTab === 'skip') {
+        return p.status === 'SKIP';
       }
       return true;
     });
@@ -308,16 +345,6 @@ class App extends React.Component {
 
   render() {
     const filteredPatients = this.getFilteredPatients();
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Header typeof:', typeof Header, Header && Header.name);
-      console.log('CurrentPatientAlert typeof:', typeof CurrentPatientAlert);
-      console.log('Statistics typeof:', typeof Statistics);
-      console.log('TabNavigation typeof:', typeof TabNavigation);
-      console.log('PatientTable typeof:', typeof PatientTable);
-      console.log('AddPatientModal typeof:', typeof AddPatientModal);
-      console.log('RoomInfoModal typeof:', typeof RoomInfoModal);
-    }
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -347,6 +374,7 @@ class App extends React.Component {
               setActiveTab={this.setActiveTab}
               countByStatus={this.countByStatus}
               lang={this.state.lang || 'TH'}
+              allRoomsExpanded={this.state.allRoomsExpanded}
             />
             
             <PatientTable 
@@ -354,6 +382,11 @@ class App extends React.Component {
               handleStart={this.handleStart}
               onRoomChange={this.handleRoomChange}
               lang={this.state.lang || 'TH'}
+              stationCode={this.state.selectedStationCode}
+              activeTab={this.state.activeTab}
+              selectedDate={this.state.selectedDate}
+              setToggleAllRoomsCallback={this.setToggleAllRoomsCallback}
+              setAllRoomsExpanded={this.setAllRoomsExpanded}
             />
           </div>
         </div>
@@ -362,12 +395,14 @@ class App extends React.Component {
           isOpen={this.state.showAddPatientModal}
           onClose={this.toggleAddPatientModal}
           onAddPatient={this.handleAddPatient}
+          stationCode={this.state.selectedStationCode}
         />
 
         <RoomInfoModal
           isOpen={this.state.showRoomInfo}
           onClose={this.toggleRoomInfo}
           lang={this.state.lang || 'TH'}
+          stationCode={this.state.selectedStationCode}
         />
       </div>
     );

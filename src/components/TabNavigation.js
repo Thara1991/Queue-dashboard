@@ -19,9 +19,27 @@ const CheckCircleIcon = ({ className }) => (
   </svg>
 );
 
+const ChevronDownIcon = ({ className }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+  </svg>
+);
+
+const ChevronUpIcon = ({ className }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6 1.41 1.41z"/>
+  </svg>
+);
+
+const SkipIcon = ({ className }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+  </svg>
+);
+
 class TabNavigation extends React.Component {
   render() {
-    const { activeTab, setActiveTab, countByStatus, lang } = this.props;
+    const { activeTab, setActiveTab, countByStatus, lang, allRoomsExpanded = false } = this.props;
 
     return (
       <div className="flex border-b border-gray-200">
@@ -48,19 +66,26 @@ class TabNavigation extends React.Component {
           <div className="flex items-center justify-center gap-2">
             <UserIcon className="w-5 h-5" />
             <span>{lang === 'EN' ? 'Active' : 'กำลังตรวจ'} ({countByStatus('active')})</span>
+            {activeTab === 'active' && countByStatus('active') > 0 && (
+              allRoomsExpanded ? (
+                <ChevronUpIcon className="w-4 h-4 opacity-75" title={lang === 'EN' ? 'Click to collapse all rooms' : 'คลิกเพื่อย่อห้องทั้งหมด'} />
+              ) : (
+                <ChevronDownIcon className="w-4 h-4 opacity-75" title={lang === 'EN' ? 'Click to expand all rooms' : 'คลิกเพื่อขยายห้องทั้งหมด'} />
+              )
+            )}
           </div>
         </button>
 
         <button
-          onClick={function() { setActiveTab('completed'); }}
+          onClick={function() { setActiveTab('skip'); }}
           className={'flex-1 px-6 py-4 font-semibold text-center transition-all ' + 
-            (activeTab === 'completed' 
-              ? 'bg-green-500 text-white border-b-4 border-green-600' 
+            (activeTab === 'skip' 
+              ? 'bg-orange-500 text-white border-b-4 border-orange-600' 
               : 'bg-gray-50 text-gray-600 hover:bg-gray-100')}
         >
           <div className="flex items-center justify-center gap-2">
-            <CheckCircleIcon className="w-5 h-5" />
-            <span>{lang === 'EN' ? 'Completed' : 'ตรวจเสร็จแล้ว'} ({countByStatus('completed')})</span>
+            <SkipIcon className="w-5 h-5" />
+            <span>{lang === 'EN' ? 'Skip' : 'ข้ามคิว'} ({countByStatus('skip')})</span>
           </div>
         </button>
       </div>
