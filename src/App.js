@@ -169,6 +169,32 @@ class App extends React.Component {
         console.log('Complete button clicked - API return data:', JSON.stringify(data, null, 2));
       }
 
+      // If Call button was clicked successfully, also call the callqueue API
+      if (fstatus === 'CALL') {
+        try {
+          const roomId = patient.room_id || patient.room;
+          if (roomId) {
+            const callQueueUrl = `http://localhost:3002/api/v1/dashboard/callqueue?id=${roomId}&called=Y`;
+            console.log('Calling callqueue API:', callQueueUrl);
+            const callQueueResponse = await fetch(callQueueUrl, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            if (callQueueResponse.ok) {
+              const callQueueData = await callQueueResponse.json();
+              console.log('Callqueue API response:', callQueueData);
+            } else {
+              console.warn('Callqueue API returned non-OK status:', callQueueResponse.status);
+            }
+          }
+        } catch (callQueueError) {
+          console.error('Error calling callqueue API:', callQueueError);
+          // Don't throw - we don't want to fail the whole operation if this secondary call fails
+        }
+      }
+
       // Extract exam_time from response (check multiple possible response structures)
       let examTime = null;
       if (data && data.exam_time !== undefined && data.exam_time !== null) {
